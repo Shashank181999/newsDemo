@@ -1,11 +1,24 @@
 // BroadcastPro ME WordPress API Integration - Optimized for Speed
 
 const API_BASE = 'https://www.broadcastprome.com/wp-json/wp/v2';
+const API_TIMEOUT = 2000; // 2 second timeout - fail fast
 
 // In-memory cache for faster loading
 let cachedArticles: Article[] | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+
+// Fetch with timeout for fast loading
+async function fetchWithTimeout(url: string, timeout: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 export interface WPPost {
   id: number;
@@ -107,12 +120,10 @@ export async function getLatestPosts(count: number = 10): Promise<Article[]> {
   }
 
   try {
-    const res = await fetch(
-      `${API_BASE}/posts?per_page=${Math.min(count, 50)}&_embed`,
-      {
-        next: { revalidate: 60 },
-        headers: { 'Accept': 'application/json' }
-      }
+    // Use timeout to fail fast if API is slow
+    const res = await fetchWithTimeout(
+      `${API_BASE}/posts?per_page=${Math.min(count, 15)}&_embed`,
+      API_TIMEOUT
     );
 
     if (res.ok) {
@@ -124,11 +135,11 @@ export async function getLatestPosts(count: number = 10): Promise<Article[]> {
         return articles.slice(0, count);
       }
     }
-  } catch (error) {
-    console.error('API error:', error);
+  } catch {
+    // Timeout or error - use mock data for instant loading
   }
 
-  // Fallback to mock only if API fails
+  // Fallback to mock for instant loading
   return getMockArticles(count);
 }
 

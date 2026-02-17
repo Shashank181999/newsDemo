@@ -47,6 +47,11 @@
 /* Ultra Smooth Scrolling with Lenis-like behavior */
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  overflow-x: hidden;
 }
 
 @supports (scroll-behavior: smooth) {

@@ -135,7 +135,7 @@ function BreakingNewsTicker({ articles }: { articles: Article[] }) {
         <div className="overflow-hidden flex-1">
           <motion.div
             animate={{ x: ['0%', '-50%'] }}
-            transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
+            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
             className="flex whitespace-nowrap will-change-transform"
           >
             {[...articles, ...articles].map((article, i) => (
@@ -240,7 +240,7 @@ function HeroCarousel({ articles, onImageLoad, isReady }: { articles: Article[];
     >
       <div className="max-w-7xl mx-auto">
         {/* Desktop: Split Layout - Content Left (First), Image Right (Second) */}
-        <div className="hidden lg:grid lg:grid-cols-2 gap-0 min-h-[70vh]">
+        <div className="hidden lg:grid lg:grid-cols-2 gap-0 h-[70vh]">
           {/* Text Content - Left Side - Animates FIRST with parallax */}
           <motion.div
             initial={{ opacity: 0, x: -80 }}
@@ -277,7 +277,7 @@ function HeroCarousel({ articles, onImageLoad, isReady }: { articles: Article[];
                   initial={{ opacity: 0, x: -60 }}
                   animate={isReady ? { opacity: 1, x: 0 } : { opacity: 0, x: -60 }}
                   transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="text-3xl xl:text-4xl 2xl:text-5xl text-white mb-5 leading-[1.2] font-light tracking-tight"
+                  className="text-3xl xl:text-4xl 2xl:text-5xl text-white mb-5 leading-[1.2] font-light tracking-tight line-clamp-3"
                 >
                   {currentArticle.title}
                 </motion.h1>
@@ -449,7 +449,7 @@ function HeroCarousel({ articles, onImageLoad, isReady }: { articles: Article[];
                   initial={{ opacity: 0, x: -40 }}
                   animate={isReady ? { opacity: 1, x: 0 } : { opacity: 0, x: -40 }}
                   transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="text-xl sm:text-2xl text-white mb-3 leading-tight font-light"
+                  className="text-xl sm:text-2xl text-white mb-3 leading-tight font-light line-clamp-2"
                 >
                   {currentArticle.title}
                 </motion.h1>

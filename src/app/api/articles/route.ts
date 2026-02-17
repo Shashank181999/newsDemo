@@ -1,42 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { articles, getLatestArticles, getFeaturedArticles, getTrendingArticles, getArticlesByCategory } from '@/data/mock';
-import { PaginatedResponse, Article } from '@/types';
+import { getLatestPosts, getTrendingPosts, searchPosts } from '@/lib/api';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '10');
-  const category = searchParams.get('category');
-  const featured = searchParams.get('featured');
+  const limit = Math.min(parseInt(searchParams.get('limit') || '15'), 50); // Max 50 articles
   const trending = searchParams.get('trending');
+  const search = searchParams.get('search');
 
-  let filteredArticles: Article[] = [];
+  try {
+    let articles;
 
-  if (featured === 'true') {
-    filteredArticles = getFeaturedArticles(limit);
-  } else if (trending === 'true') {
-    filteredArticles = getTrendingArticles(limit);
-  } else if (category) {
-    filteredArticles = getArticlesByCategory(category);
-  } else {
-    filteredArticles = getLatestArticles(100);
-  }
-
-  const total = filteredArticles.length;
-  const totalPages = Math.ceil(total / limit);
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const paginatedData = filteredArticles.slice(startIndex, endIndex);
-
-  const response: PaginatedResponse<Article> = {
-    data: paginatedData,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages
+    if (search) {
+      articles = await searchPosts(search, limit);
+    } else if (trending === 'true') {
+      articles = await getTrendingPosts(limit);
+    } else {
+      articles = await getLatestPosts(limit);
     }
-  };
 
-  return NextResponse.json(response);
+    // Return with cache headers for faster subsequent loads
+    return NextResponse.json(
+      { articles, total: articles.length },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error fetching articles:', error);
+    return NextResponse.json({
+      articles: [],
+      total: 0,
+      error: 'Failed to fetch articles'
+    }, { status: 500 });
+  }
 }

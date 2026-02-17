@@ -1,23 +1,11 @@
-// BroadcastPro ME WordPress API Integration
+// BroadcastPro ME WordPress API Integration - Optimized for Speed
 
 const API_BASE = 'https://www.broadcastprome.com/wp-json/wp/v2';
-const FETCH_TIMEOUT = 8000; // 8 second timeout for initial fetch
 
-// Fetch with timeout
-async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    return response;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+// In-memory cache for faster loading
+let cachedArticles: Article[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes cache
 
 export interface WPPost {
   id: number;
@@ -109,42 +97,39 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
-// Fetch latest posts from BroadcastPro ME
+// Fetch latest posts from broadcastprome.com
 export async function getLatestPosts(count: number = 10): Promise<Article[]> {
-  try {
-    console.log('Fetching from BroadcastPro ME API...');
+  const now = Date.now();
 
-    const res = await fetchWithTimeout(
-      `${API_BASE}/posts?per_page=${count}&_embed`,
+  // Return cached data if fresh
+  if (cachedArticles && (now - cacheTimestamp) < CACHE_DURATION) {
+    return cachedArticles.slice(0, count);
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/posts?per_page=${Math.min(count, 50)}&_embed`,
       {
-        next: { revalidate: 600 }, // Cache for 10 minutes
+        next: { revalidate: 60 },
         headers: { 'Accept': 'application/json' }
       }
     );
 
-    if (!res.ok) {
-      console.log('API returned non-OK status:', res.status);
-      return getMockArticles(count);
+    if (res.ok) {
+      const posts: WPPost[] = await res.json();
+      if (posts.length > 0) {
+        const articles = posts.map(transformPost);
+        cachedArticles = articles;
+        cacheTimestamp = now;
+        return articles.slice(0, count);
+      }
     }
-
-    const text = await res.text();
-    if (!text || text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
-      console.log('API returned HTML instead of JSON');
-      return getMockArticles(count);
-    }
-
-    const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) {
-      console.log('API response is not an array');
-      return getMockArticles(count);
-    }
-
-    console.log(`✓ Loaded ${parsed.length} real articles from BroadcastPro ME`);
-    return parsed.map(transformPost);
   } catch (error) {
-    console.log('API fetch failed:', error);
-    return getMockArticles(count);
+    console.error('API error:', error);
   }
+
+  // Fallback to mock only if API fails
+  return getMockArticles(count);
 }
 
 // Fallback mock articles when API fails
@@ -261,7 +246,7 @@ function getMockArticles(count: number): Article[] {
       slug: 'sports-broadcasting-digital',
       excerpt: 'How streaming platforms are reshaping sports media rights in the MENA region.',
       content: '',
-      featuredImage: 'https://images.unsplash.com/photo-1461896836934- voices-of-change?w=800&q=80',
+      featuredImage: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&q=80',
       category: 'Sports',
       author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
       publishedAt: new Date(Date.now() - 604800000).toISOString(),
@@ -297,6 +282,306 @@ function getMockArticles(count: number): Article[] {
       publishedAt: new Date(Date.now() - 777600000).toISOString(),
       tags: ['Esports', 'Gaming'],
       views: 3240,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '11',
+      title: 'Live Event Production Goes Hybrid: Combining Physical and Virtual Audiences',
+      slug: 'hybrid-event-production',
+      excerpt: 'Event producers embrace hybrid formats to maximize reach and engagement.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&q=80',
+      category: 'Events',
+      author: { id: '3', name: 'Emma Williams', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma' },
+      publishedAt: new Date(Date.now() - 864000000).toISOString(),
+      tags: ['Events', 'Hybrid'],
+      views: 1890,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '12',
+      title: 'Broadcast Equipment Market Report: Q4 2025 Analysis',
+      slug: 'broadcast-equipment-q4-2025',
+      excerpt: 'Comprehensive analysis of the broadcast equipment market trends and forecasts.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=800&q=80',
+      category: 'Industry Analysis',
+      author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
+      publishedAt: new Date(Date.now() - 950400000).toISOString(),
+      tags: ['Market', 'Analysis'],
+      views: 2450,
+      isTrending: true,
+      isFeatured: false,
+    },
+    {
+      id: '13',
+      title: 'IP-Based Workflows Become Standard in Modern Broadcast Facilities',
+      slug: 'ip-based-broadcast-workflows',
+      excerpt: 'SMPTE ST 2110 adoption accelerates as broadcasters modernize their infrastructure.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&q=80',
+      category: 'Technology',
+      author: { id: '1', name: 'Sarah Johnson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
+      publishedAt: new Date(Date.now() - 1036800000).toISOString(),
+      tags: ['IP', 'Broadcast'],
+      views: 1670,
+      isTrending: false,
+      isFeatured: true,
+    },
+    {
+      id: '14',
+      title: 'Content Localization Strategies for MENA Streaming Platforms',
+      slug: 'content-localization-mena',
+      excerpt: 'How streaming services are adapting content for diverse Middle Eastern audiences.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=800&q=80',
+      category: 'Streaming & OTT',
+      author: { id: '2', name: 'Michael Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=michael' },
+      publishedAt: new Date(Date.now() - 1123200000).toISOString(),
+      tags: ['Localization', 'Streaming'],
+      views: 2120,
+      isTrending: true,
+      isFeatured: false,
+    },
+    {
+      id: '15',
+      title: 'Drone Technology Revolutionizes Aerial Cinematography',
+      slug: 'drone-aerial-cinematography',
+      excerpt: 'Advanced drone systems enable stunning aerial shots previously impossible.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=800&q=80',
+      category: 'Production',
+      author: { id: '3', name: 'Emma Williams', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma' },
+      publishedAt: new Date(Date.now() - 1209600000).toISOString(),
+      tags: ['Drones', 'Cinematography'],
+      views: 3560,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '16',
+      title: 'Audio Engineering Excellence: Spatial Sound in Broadcasting',
+      slug: 'spatial-sound-broadcasting',
+      excerpt: 'Immersive audio technologies transform the viewer experience.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&q=80',
+      category: 'Audio',
+      author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
+      publishedAt: new Date(Date.now() - 1296000000).toISOString(),
+      tags: ['Audio', 'Spatial'],
+      views: 1340,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '17',
+      title: 'MediaTech Summit Dubai: Highlights and Key Takeaways',
+      slug: 'mediatech-summit-dubai-2025',
+      excerpt: 'Industry leaders gather to discuss the future of media technology in the region.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
+      category: 'Events',
+      author: { id: '1', name: 'Sarah Johnson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
+      publishedAt: new Date(Date.now() - 1382400000).toISOString(),
+      tags: ['Summit', 'Dubai'],
+      views: 4230,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '18',
+      title: 'Green Broadcasting: Sustainable Practices in Media Production',
+      slug: 'green-broadcasting-sustainability',
+      excerpt: 'How broadcasters are reducing their environmental footprint.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1497436072909-60f360e1d4b1?w=800&q=80',
+      category: 'Sustainability',
+      author: { id: '2', name: 'Michael Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=michael' },
+      publishedAt: new Date(Date.now() - 1468800000).toISOString(),
+      tags: ['Green', 'Sustainability'],
+      views: 1890,
+      isTrending: false,
+      isFeatured: true,
+    },
+    {
+      id: '19',
+      title: 'Neural Network-Based Video Compression Achieves Breakthrough',
+      slug: 'neural-video-compression',
+      excerpt: 'AI-powered compression algorithms deliver higher quality at lower bitrates.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&q=80',
+      category: 'AI & Technology',
+      author: { id: '3', name: 'Emma Williams', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma' },
+      publishedAt: new Date(Date.now() - 1555200000).toISOString(),
+      tags: ['AI', 'Compression'],
+      views: 2780,
+      isTrending: true,
+      isFeatured: false,
+    },
+    {
+      id: '20',
+      title: 'Remote Collaboration Tools Transform Post-Production Workflows',
+      slug: 'remote-post-production',
+      excerpt: 'Cloud-based editing platforms enable seamless global collaboration.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1536240478700-b869070f9279?w=800&q=80',
+      category: 'Post-Production',
+      author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
+      publishedAt: new Date(Date.now() - 1641600000).toISOString(),
+      tags: ['Remote', 'Post-Production'],
+      views: 2340,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '21',
+      title: 'LED Wall Technology Transforms Studio Design',
+      slug: 'led-wall-studio-design',
+      excerpt: 'Virtual production LED volumes becoming standard in modern studios.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1478737270239-2f02b77fc618?w=800&q=80',
+      category: 'Virtual Production',
+      author: { id: '1', name: 'Sarah Johnson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
+      publishedAt: new Date(Date.now() - 1728000000).toISOString(),
+      tags: ['LED', 'Studio'],
+      views: 3120,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '22',
+      title: 'Broadcast Security: Protecting Content in the Digital Age',
+      slug: 'broadcast-security-digital',
+      excerpt: 'Cybersecurity best practices for media organizations.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&q=80',
+      category: 'Security',
+      author: { id: '2', name: 'Michael Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=michael' },
+      publishedAt: new Date(Date.now() - 1814400000).toISOString(),
+      tags: ['Security', 'Digital'],
+      views: 1560,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '23',
+      title: 'Women in Media Tech: Breaking Barriers and Leading Innovation',
+      slug: 'women-media-tech-leaders',
+      excerpt: 'Celebrating female pioneers driving change in broadcast technology.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=800&q=80',
+      category: 'Industry',
+      author: { id: '3', name: 'Emma Williams', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma' },
+      publishedAt: new Date(Date.now() - 1900800000).toISOString(),
+      tags: ['Women', 'Leadership'],
+      views: 2890,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '24',
+      title: '8K Production: Is the Industry Ready for Ultra-High Resolution?',
+      slug: '8k-production-readiness',
+      excerpt: 'Examining the challenges and opportunities of 8K content creation.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=800&q=80',
+      category: 'Technology',
+      author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
+      publishedAt: new Date(Date.now() - 1987200000).toISOString(),
+      tags: ['8K', 'Resolution'],
+      views: 2120,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '25',
+      title: 'Interactive TV: Engaging Audiences Through Second Screen Experiences',
+      slug: 'interactive-tv-second-screen',
+      excerpt: 'How broadcasters are creating immersive multi-platform experiences.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1593784991095-a205069470b6?w=800&q=80',
+      category: 'Broadcasting',
+      author: { id: '1', name: 'Sarah Johnson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
+      publishedAt: new Date(Date.now() - 2073600000).toISOString(),
+      tags: ['Interactive', 'Second Screen'],
+      views: 1780,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '26',
+      title: 'Satellite Technology Evolution: Next-Gen Broadcasting from Space',
+      slug: 'satellite-next-gen-broadcasting',
+      excerpt: 'New satellite constellations promise revolutionary broadcast capabilities.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=80',
+      category: 'Satellite',
+      author: { id: '2', name: 'Michael Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=michael' },
+      publishedAt: new Date(Date.now() - 2160000000).toISOString(),
+      tags: ['Satellite', 'Space'],
+      views: 2450,
+      isTrending: true,
+      isFeatured: false,
+    },
+    {
+      id: '27',
+      title: 'AR Graphics Transform Sports Broadcasting Experience',
+      slug: 'ar-graphics-sports-broadcasting',
+      excerpt: 'Augmented reality overlays bring new dimensions to live sports coverage.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1461896836934- voices?w=800&q=80',
+      category: 'Sports',
+      author: { id: '3', name: 'Emma Williams', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=emma' },
+      publishedAt: new Date(Date.now() - 2246400000).toISOString(),
+      tags: ['AR', 'Sports'],
+      views: 3670,
+      isTrending: true,
+      isFeatured: true,
+    },
+    {
+      id: '28',
+      title: 'Media Archive Digitization: Preserving Broadcast History',
+      slug: 'media-archive-digitization',
+      excerpt: 'Broadcasters invest in preserving decades of valuable content.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=800&q=80',
+      category: 'Archives',
+      author: { id: '4', name: 'David Park', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david' },
+      publishedAt: new Date(Date.now() - 2332800000).toISOString(),
+      tags: ['Archives', 'Digitization'],
+      views: 1230,
+      isTrending: false,
+      isFeatured: false,
+    },
+    {
+      id: '29',
+      title: 'Broadcast Automation: AI-Powered Master Control Systems',
+      slug: 'broadcast-automation-ai',
+      excerpt: 'Intelligent automation systems reduce errors and improve efficiency.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80',
+      category: 'AI & Technology',
+      author: { id: '1', name: 'Sarah Johnson', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=sarah' },
+      publishedAt: new Date(Date.now() - 2419200000).toISOString(),
+      tags: ['Automation', 'AI'],
+      views: 2890,
+      isTrending: true,
+      isFeatured: false,
+    },
+    {
+      id: '30',
+      title: 'The Future of News: AI Anchors and Automated Journalism',
+      slug: 'ai-anchors-automated-journalism',
+      excerpt: 'Exploring the role of artificial intelligence in news production.',
+      content: '',
+      featuredImage: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&q=80',
+      category: 'AI & Technology',
+      author: { id: '2', name: 'Michael Chen', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=michael' },
+      publishedAt: new Date(Date.now() - 2505600000).toISOString(),
+      tags: ['AI', 'Journalism'],
+      views: 4120,
       isTrending: true,
       isFeatured: true,
     },
